@@ -11,6 +11,7 @@
     <application
         android:name=".ClearFrameApplication"
         android:allowBackup="true"
+        android:extractNativeLibs="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -31,6 +32,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <receiver android:name=".ConfigReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="com.ezhart.clearframe.SET_CONFIG"/>
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

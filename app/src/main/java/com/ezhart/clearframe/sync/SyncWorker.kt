@@ -58,20 +58,12 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         try {
-            val config = loadConfig(applicationContext)
-
-            if (config.immichUrl.isEmpty() || config.immichApiKey.isEmpty() || config.immichAlbumIds.isEmpty()) {
-                Log.e(TAG, "Config missing - check clearframe_config.txt")
-                return Result.failure()
-            }
-
-            config.immichAlbumIds.forEach { albumId ->
-                syncImmich(
-                    baseUrl = config.immichUrl,
-                    apiKey = config.immichApiKey,
-                    albumId = albumId
-                )
-            }
+            Log.d(TAG, "About to call syncImmich")
+            syncImmich(
+                baseUrl = "YOUR IMMICH URL",
+                apiKey = "YOUR IMMICH API KEY",
+                albumId = "YOUR IMMICH ALBUM ID(s)"
+            )
 
             return Result.success()
         } catch (e: Exception) {
@@ -96,8 +88,8 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
 
         val localPhotos = getLocalPhotoList()
 
-        val toDownload = getDownloadList(remoteAssets, localPhotos)
-        val toDelete = getDeleteList(remoteAssets, localPhotos)
+        val toDownload = remoteAssets // download everything, skip local check
+        val toDelete = emptyList<Photo>() // skip deletion for now
 
         val photosDeleted = cleanupPhotos(toDelete)
         val photosDownloaded = downloadPhotos(photoService, apiKey, baseUrl, toDownload)

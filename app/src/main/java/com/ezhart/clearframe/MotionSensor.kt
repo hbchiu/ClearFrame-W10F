@@ -1,5 +1,6 @@
 package com.kitesystems.nix.frame
 
+import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.delay
 import org.greenrobot.eventbus.EventBus
@@ -65,10 +66,10 @@ class MotionSensor {
         private var HAVE_GPIO = false
         private const val LIBRARY_NAME = "gpio_jni"
 
-        init {
+        fun initialize(context: Context) {
             HAVE_GPIO = false
             try {
-                System.loadLibrary(LIBRARY_NAME)
+                System.load(context.applicationInfo.nativeLibraryDir + "/libgpio_jni.so")
                 HAVE_GPIO = true
                 Log.d(TAG, "Motion Sensor initialized")
             } catch (e: UnsatisfiedLinkError) {

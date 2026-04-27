@@ -73,6 +73,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        MotionSensor.initialize(this)
+
         enableEdgeToEdge()
 
         setContent {
@@ -146,7 +148,7 @@ class MainActivity : ComponentActivity() {
 
         val hour = cal.get(Calendar.HOUR_OF_DAY)
 
-        return !(hour < 7 || hour > 21)
+        return !(hour < 6 || hour > 24)
     }
 
     @OptIn(DelicateCoroutinesApi::class)
