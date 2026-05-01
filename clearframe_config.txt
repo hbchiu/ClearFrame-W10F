@@ -1,4 +1,8 @@
 source=immich
-immich_url=http://YOUR_IMMICH_SERVER_IP:2283/
-immich_api_key=YOUR_API_KEY_HERE
-immich_album=YOUR_ALBUM_UUID_HERE,UUID2,UUID3
+immich_url=http://YOUR IMMICH URL/
+immich_api_key= YOUR KEY
+immich_album=YOUR IMMICH ALBUMS, COMMA SEPARATED
+display_mode=ADAPTIVE, FILL, OR MATCH
+motion_sensor=on
+sleep_hour=23
+wake_hour=6
