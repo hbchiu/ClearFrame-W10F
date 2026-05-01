@@ -23,6 +23,7 @@
         <service android:name=".sync.SyncService"/>
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize"
             android:exported="true"
             android:theme="@style/Theme.ClearFrame">
             <intent-filter>

@@ -23,6 +23,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 
+
 private const val TAG = "SyncService"
 
 interface RemotePhotoService {
@@ -39,6 +40,7 @@ interface RemotePhotoService {
         @Header("x-api-key") apiKey: String
     ): Response<ResponseBody>
 }
+
 
 data class ImmichAlbum(
     val assets: List<ImmichAsset>
@@ -59,10 +61,11 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
     override suspend fun doWork(): Result {
         try {
             Log.d(TAG, "About to call syncImmich")
+            val config = loadConfig(applicationContext)
             syncImmich(
-                baseUrl = "YOUR IMMICH URL",
-                apiKey = "YOUR IMMICH API KEY",
-                albumId = "YOUR IMMICH ALBUM ID(s)"
+                baseUrl = config.immichUrl,
+                apiKey = config.immichApiKey,
+                albumId = config.immichAlbumId
             )
 
             return Result.success()
@@ -88,8 +91,8 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
 
         val localPhotos = getLocalPhotoList()
 
-        val toDownload = remoteAssets // download everything, skip local check
-        val toDelete = emptyList<Photo>() // skip deletion for now
+        val toDownload = getDownloadList(remoteAssets, localPhotos)
+        val toDelete = getDeleteList(remoteAssets, localPhotos)
 
         val photosDeleted = cleanupPhotos(toDelete)
         val photosDownloaded = downloadPhotos(photoService, apiKey, baseUrl, toDownload)
@@ -139,7 +142,13 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
         var photosChanged = false
         for (asset in assets) {
             Log.d(TAG, "Downloading ${asset.originalFileName}")
-            val url = "${baseUrl}api/assets/${asset.id}/original"
+            val isVideo = asset.originalFileName.endsWith("mp4", true) ||
+                    asset.originalFileName.endsWith("mov", true)
+            val url = if (isVideo) {
+                "${baseUrl}api/assets/${asset.id}/video/playback"
+            } else {
+                "${baseUrl}api/assets/${asset.id}/original"
+            }
             Log.d(TAG, "Download URL: $url")
             val response = photoService.download(url, apiKey)
             Log.d(TAG, "Response code: ${response.code()}")

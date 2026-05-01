@@ -14,13 +14,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
+import com.ezhart.clearframe.sync.ReloadRequest
 
 sealed interface SlideDirection {
     data object Forward : SlideDirection
     data object Backward : SlideDirection
 }
 
-class SlideshowViewModel(val photos: List<Photo>) : ViewModel() {
+class SlideshowViewModel(val photos: MutableList<Photo>) : ViewModel() {
     private var currentIndex: Int = 0
     private var autoAdvance: Boolean = true
     private var autoAdvanceInterval: Long = 10
@@ -34,8 +35,12 @@ class SlideshowViewModel(val photos: List<Photo>) : ViewModel() {
     var nextPhoto: String by mutableStateOf(currentPhoto)
     var direction: SlideDirection by mutableStateOf(Forward)
 
+    var showNewPhotosToast: Boolean by mutableStateOf(false)
+
     init {
         EventBus.getDefault().register(this)
+
+        photos.shuffle()
 
         if (autoAdvance) {
             play()
@@ -125,5 +130,14 @@ class SlideshowViewModel(val photos: List<Photo>) : ViewModel() {
 
     fun cleanup() {
         EventBus.getDefault().unregister(this)
+    }
+
+    @Subscribe
+    fun handleReloadRequest(event: ReloadRequest) {
+        showNewPhotosToast = true
+        viewModelScope.launch {
+            delay(3000)
+            showNewPhotosToast = false
+        }
     }
 }

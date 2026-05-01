@@ -18,7 +18,7 @@ class InternalStoragePhotoRepository(private val context: Context) : PhotoReposi
 
         val storagePath = context.filesDir.path
         val imagePaths: List<String> = context.fileList()
-            .filter { f -> f.endsWith("jpg", true) }
+            .filter { f -> f.endsWith("jpg", true) || f.endsWith("mp4", true) || f.endsWith("mov", true) }
             .sortedBy { f -> f }
             // Initially tried to use Path() for building this path, but got a missing library error
             // so I just punted and used a template

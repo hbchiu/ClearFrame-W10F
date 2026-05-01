@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -12,6 +13,8 @@ import android.os.PowerManager
 import android.util.Log
 import android.view.KeyEvent
 import android.view.WindowManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ezhart.clearframe.data.loadConfig
 import com.ezhart.clearframe.sync.SyncService
 import com.ezhart.clearframe.ui.screens.AppViewModel
 import com.ezhart.clearframe.ui.screens.HomeScreen
@@ -27,6 +31,7 @@ import com.kitesystems.nix.frame.MotionDetectedEvent
 import com.kitesystems.nix.frame.MotionSensor
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
@@ -44,11 +49,15 @@ class MainActivity : ComponentActivity() {
     private val motionSensor: MotionSensor = MotionSensor()
     var lastActivity: Long = epochSeconds()
     var isAwake = false
+    var appViewModel: AppViewModel? = null
 
-    // Hard coded for now, might make this a setting later
-    val sleepTimeoutSeconds = 15 * 60
+    var sleepCheckJob: Job? = null
 
-    // Hard coded for now, might make this settable later
+    var sleepTimeoutSeconds = 15 * 60
+    var sleepHourStart = 23
+    var wakeHourStart = 6
+    var motionSensorActive = true
+
     val sleepCheckInterval: Long = 1000 * 60
 
     private val remoteKeys: List<Int> = listOf(131, 132, 19, 21, 22, 20, 4, 134, 23, 24, 25)
@@ -75,6 +84,12 @@ class MainActivity : ComponentActivity() {
 
         MotionSensor.initialize(this)
 
+        val config = loadConfig(this)
+        sleepTimeoutSeconds = config.sleepTimeoutMinutes * 60
+        sleepHourStart = config.sleepHourStart
+        wakeHourStart = config.wakeHourStart
+        motionSensorActive = config.motionSensorEnabled
+
         enableEdgeToEdge()
 
         setContent {
@@ -84,9 +99,11 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val vm: AppViewModel =
                         viewModel(factory = AppViewModel.Factory)
+                    appViewModel = vm
 
                     HomeScreen(
-                        uiState = vm.uiState
+                        uiState = vm.uiState,
+                        displayMode = vm.displayMode
                     )
                 }
             }
@@ -103,7 +120,15 @@ class MainActivity : ComponentActivity() {
         EventBus.getDefault().register(this)
 
         GlobalScope.launch { motionSensor.start() }
-        GlobalScope.launch { sleepCheck() }
+        if (!isAwake) {
+            sleepCheckJob = GlobalScope.launch { sleepCheck() }
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Log.d(TAG, "Configuration changed, reloading photos")
+        appViewModel?.reload()
     }
 
     override fun onResume() {
@@ -140,15 +165,10 @@ class MainActivity : ComponentActivity() {
     }
 
     fun isInWakeSchedule(): Boolean {
-        // Using a hard-coded wake schedule from 7 AM to 10 PM right now. Might make this into a
-        // real setting eventually.
-
         val tz = TimeZone.getDefault()
         val cal = Calendar.getInstance(tz)
-
         val hour = cal.get(Calendar.HOUR_OF_DAY)
-
-        return !(hour < 6 || hour > 24)
+        return !(hour < wakeHourStart || hour >= sleepHourStart)
     }
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -158,12 +178,11 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val pm = applicationContext.getSystemService(POWER_SERVICE) as PowerManager
-        val screenIsOn = pm.isInteractive // check if screen is on
+        val screenIsOn = pm.isInteractive
         if (!screenIsOn) {
-
             Log.d(TAG, "Screen is not active, (briefly) acquiring wake lock to wake it up")
             val wakeLockTag = packageName + "WAKELOCK"
             val wakeLock = pm.newWakeLock(
@@ -171,14 +190,14 @@ class MainActivity : ComponentActivity() {
                         PowerManager.ACQUIRE_CAUSES_WAKEUP or
                         PowerManager.ON_AFTER_RELEASE, wakeLockTag
             )
-
             wakeLock.acquire(10 * 1000)
             wakeLock.release()
         }
 
         isAwake = true
 
-        GlobalScope.launch { sleepCheck() }
+        sleepCheckJob?.cancel()
+        sleepCheckJob = GlobalScope.launch { sleepCheck() }
     }
 
     fun sleep() {
@@ -186,12 +205,11 @@ class MainActivity : ComponentActivity() {
 
         isAwake = false
 
-        Log.d(
-            TAG,
-            "Device should go to sleep, disabling FLAG_KEEP_SCREEN_ON"
-        )
+        Log.d(TAG, "Device should go to sleep, disabling FLAG_KEEP_SCREEN_ON")
 
-        Handler(Looper.getMainLooper()).post { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); }
+        Handler(Looper.getMainLooper()).post {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     suspend fun sleepCheck() {
@@ -213,11 +231,10 @@ class MainActivity : ComponentActivity() {
 
     @Subscribe(threadMode = ThreadMode.MAIN_ORDERED)
     public fun handleMotionDetected(event: MotionDetectedEvent) {
+        if (!motionSensorActive) return
         resetInactivityTimer()
-
         if (isInWakeSchedule()) {
             wake()
         }
     }
 }
-
